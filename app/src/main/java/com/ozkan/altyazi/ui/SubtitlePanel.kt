@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ozkan.altyazi.R
 import com.ozkan.altyazi.data.AppSettings
+import com.ozkan.altyazi.translate.LineOrigin
 import com.ozkan.altyazi.ui.theme.AppColors
 import com.ozkan.altyazi.ui.theme.toFontFamily
 import kotlinx.coroutines.launch
@@ -143,7 +144,11 @@ private fun Transcript(
                     if (settings.showOriginal) {
                         Spacer(Modifier.height(if (isCurrent) 12.dp else 4.dp))
                         Text(
-                            if (line.refined) "✦ ${line.original}" else line.original,
+                            when (line.origin) {
+                                LineOrigin.PACK -> "◆ ${line.original}"   // ready-made game translation
+                                LineOrigin.AI, LineOrigin.ONLINE -> "✦ ${line.original}"
+                                LineOrigin.FAST -> line.original
+                            },
                             style = TextStyle(
                                 fontSize = (settings.textSizeSp * if (isCurrent) 0.42f else 0.3f).coerceAtLeast(12f).sp,
                                 color = AppColors.TextSecondary,

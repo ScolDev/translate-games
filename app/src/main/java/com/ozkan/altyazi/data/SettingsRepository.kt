@@ -41,6 +41,10 @@ class SettingsRepository(context: Context) {
         val roiRight = floatPreferencesKey("roi_right")
         val roiBottom = floatPreferencesKey("roi_bottom")
         val cameraId = stringPreferencesKey("camera_id")
+        val packsEnabled = booleanPreferencesKey("packs_enabled")
+        val onlineEngine = stringPreferencesKey("online_engine")
+        val onlineModel = stringPreferencesKey("online_model")
+        fun apiKey(engine: OnlineEngine) = stringPreferencesKey("api_key_" + engine.key)
         val streamRoiLeft = floatPreferencesKey("stream_roi_left")
         val streamRoiTop = floatPreferencesKey("stream_roi_top")
         val streamRoiRight = floatPreferencesKey("stream_roi_right")
@@ -91,6 +95,10 @@ class SettingsRepository(context: Context) {
             roi = roi,
             streamRoi = streamRoi,
             cameraId = this[Keys.cameraId],
+            packsEnabled = this[Keys.packsEnabled] ?: d.packsEnabled,
+            onlineEngine = keyedValueOf(this[Keys.onlineEngine], d.onlineEngine),
+            onlineModel = this[Keys.onlineModel],
+            apiKeys = OnlineEngine.entries.mapNotNull { e -> this[Keys.apiKey(e)]?.let { e.key to it } }.toMap(),
         )
     }
 
@@ -115,5 +123,12 @@ class SettingsRepository(context: Context) {
         this[Keys.streamRoiRight] = s.streamRoi.right
         this[Keys.streamRoiBottom] = s.streamRoi.bottom
         if (s.cameraId != null) this[Keys.cameraId] = s.cameraId else remove(Keys.cameraId)
+        this[Keys.packsEnabled] = s.packsEnabled
+        this[Keys.onlineEngine] = s.onlineEngine.key
+        if (s.onlineModel != null) this[Keys.onlineModel] = s.onlineModel else remove(Keys.onlineModel)
+        OnlineEngine.entries.forEach { e ->
+            val key = s.apiKeys[e.key]?.trim()
+            if (key.isNullOrEmpty()) remove(Keys.apiKey(e)) else this[Keys.apiKey(e)] = key
+        }
     }
 }

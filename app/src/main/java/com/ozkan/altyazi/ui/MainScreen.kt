@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FullscreenExit
+import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.TouchApp
@@ -202,6 +203,8 @@ private fun TranslatorLayout(state: UiState, viewModel: MainViewModel, streaming
 
     if (settingsOpen) {
         SettingsSheet(
+            game = viewModel.game,
+            packGame = state.packGame,
             settings = state.settings,
             voiceMissing = state.voiceMissing,
             aiState = state.aiState,
@@ -318,6 +321,13 @@ private fun CameraFooter(state: UiState, remoteMode: Boolean) {
         if (!remoteMode) state.cameraError?.let {
             Text(stringResource(R.string.camera_error, it), style = MaterialTheme.typography.bodySmall, color = AppColors.Danger)
             Text(stringResource(R.string.camera_hint_external), style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
+        }
+        state.packGame?.let { title ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Inventory2, null, tint = AppColors.Success, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.pack_in_use, title), style = MaterialTheme.typography.bodyMedium, color = AppColors.TextSecondary)
+            }
         }
         Spacer(Modifier.weight(1f))
         state.metrics?.let {

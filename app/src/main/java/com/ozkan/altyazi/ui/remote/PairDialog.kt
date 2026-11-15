@@ -225,6 +225,7 @@ private fun Steps() {
             Step(1, stringResource(R.string.pair_step1))
             Step(2, stringResource(R.string.pair_step2))
             Step(3, stringResource(R.string.pair_step3))
+            Text(stringResource(R.string.pair_second_account), style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
         }
     }
 }

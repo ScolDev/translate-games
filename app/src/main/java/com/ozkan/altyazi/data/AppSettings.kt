@@ -70,6 +70,18 @@ enum class Quality(
     MAX("max", R.string.quality_max, R.string.quality_max_desc, 6, true, 800),
 }
 
+/**
+ * Optional online translation with the user's own key (CouchSubs' engines). Text leaves the tablet
+ * only when one of these is chosen; [NONE] keeps everything offline.
+ */
+enum class OnlineEngine(override val key: String, @StringRes val label: Int, val aiProvider: String?) : Keyed {
+    NONE("none", R.string.engine_none, null),
+    GEMINI("gemini", R.string.engine_gemini, "gemini"),
+    DEEPL("deepl", R.string.engine_deepl, null),
+    OPENAI("openai", R.string.engine_openai, "openai"),
+    CLAUDE("claude", R.string.engine_claude, "claude"),
+}
+
 /** Normalized (0..1) subtitle region relative to the camera frame or the streamed picture. */
 data class Roi(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val width get() = right - left
@@ -96,6 +108,13 @@ data class AppSettings(
     val speak: Boolean = false,
     /** Optional offline AI translation with an on-device LLM (off by default). */
     val aiTranslation: Boolean = false,
+    /** Ready-made game translations (CouchSubs packs), used first for English → Turkish. */
+    val packsEnabled: Boolean = true,
+    val onlineEngine: OnlineEngine = OnlineEngine.NONE,
+    /** Model id for Gemini / OpenAI / Claude; null = the provider's first (recommended) model. */
+    val onlineModel: String? = null,
+    /** API keys by [OnlineEngine.key]; kept in app-private storage only. */
+    val apiKeys: Map<String, String> = emptyMap(),
     val sourceLanguage: Language = Language.ENGLISH,
     val targetLanguage: Language = Language.TURKISH,
     val quality: Quality = Quality.BEST,
@@ -104,6 +123,14 @@ data class AppSettings(
     val streamRoi: Roi = Roi.STREAM_DEFAULT,
     val cameraId: String? = null,
 ) {
+    val onlineKey: String? get() = apiKeys[onlineEngine.key]?.takeIf { it.isNotBlank() }
+
+    /** Pack and CouchSubs translation layers cover English → Turkish, the pair they were built for. */
+    val gameTranslationPair: Boolean get() = sourceLanguage == Language.ENGLISH && targetLanguage == Language.TURKISH
+
+    override fun toString(): String = "AppSettings(engine=${onlineEngine.key}, packs=$packsEnabled, ai=$aiTranslation, " +
+        "${sourceLanguage.key}->${targetLanguage.key})" // never print API keys
+
     fun roiFor(source: FrameSource?): Roi = if (source == FrameSource.REMOTE_PLAY) streamRoi else roi
 
     fun withRoi(source: FrameSource?, value: Roi): AppSettings =

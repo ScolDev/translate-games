@@ -1,3 +1,6 @@
 [submodule "third_party/chiaki-ng"]
 	path = third_party/chiaki-ng
 	url = https://github.com/streetpea/chiaki-ng.git
+[submodule "third_party/couchsubs"]
+	path = third_party/couchsubs
+	url = https://github.com/yorulmazsinan/couchsubs.git

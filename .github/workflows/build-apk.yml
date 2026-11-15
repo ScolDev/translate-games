@@ -21,10 +21,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Fetch Remote Play sources
+      - name: Fetch Remote Play and CouchSubs sources
         run: |
           # chiaki-ng is pinned as a submodule; only the native dependencies it needs are fetched.
-          git submodule update --init --depth 1 third_party/chiaki-ng
+          git submodule update --init --depth 1 third_party/chiaki-ng third_party/couchsubs
           git -C third_party/chiaki-ng submodule update --init --depth 1 \
             third-party/nanopb third-party/jerasure third-party/gf-complete third-party/curl
 

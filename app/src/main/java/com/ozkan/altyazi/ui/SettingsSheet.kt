@@ -39,6 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -48,6 +49,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +62,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.LocaleListCompat
@@ -66,6 +71,10 @@ import com.ozkan.altyazi.R
 import com.ozkan.altyazi.ai.AiState
 import com.ozkan.altyazi.data.AppSettings
 import com.ozkan.altyazi.data.Language
+import com.ozkan.altyazi.data.OnlineEngine
+import com.ozkan.altyazi.couchsubs.translation.KeyCheck
+import com.ozkan.altyazi.couchsubs.translation.OnlineKeyState
+import com.ozkan.altyazi.translate.GameTranslation
 import com.ozkan.altyazi.data.PanelBackground
 import com.ozkan.altyazi.data.Quality
 import com.ozkan.altyazi.data.SubtitleFont
@@ -81,6 +90,8 @@ private enum class AppLanguage(val tag: String, val label: Int) {
 
 @Composable
 fun SettingsSheet(
+    game: GameTranslation,
+    packGame: String?,
     settings: AppSettings,
     voiceMissing: Boolean,
     aiState: AiState,
@@ -123,6 +134,12 @@ fun SettingsSheet(
                 }
             }
             Hint(stringResource(R.string.settings_lang_hint))
+
+            // ---------- Translation quality (CouchSubs packs and engines) ----------
+            Group(stringResource(R.string.quality_group))
+            if (!settings.gameTranslationPair) Hint(stringResource(R.string.quality_pair_only), AppColors.Accent)
+            GamePacksSection(game, packGame, settings, onUpdate)
+            OnlineEngineSection(game, settings, onUpdate)
 
             // ---------- Appearance ----------
             Group(stringResource(R.string.settings_appearance))
@@ -207,6 +224,127 @@ fun SettingsSheet(
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.settings_clear_history))
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GamePacksSection(game: GameTranslation, packGame: String?, settings: AppSettings, onUpdate: ((AppSettings) -> AppSettings) -> Unit) {
+    val packs by game.packs.collectAsState()
+    val updating by game.updating.collectAsState()
+    SwitchRow(stringResource(R.string.packs_title), settings.packsEnabled) { v -> onUpdate { it.copy(packsEnabled = v) } }
+    Hint(stringResource(R.string.packs_desc))
+    if (settings.packsEnabled) {
+        Spacer(Modifier.height(8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            packs.forEach { pack ->
+                val active = pack.title == packGame
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (active) AppColors.Success.copy(alpha = 0.18f) else AppColors.SurfaceHigh)
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                ) {
+                    Text(
+                        if (active) "● ${pack.title}" else pack.title,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (active) AppColors.Success else AppColors.TextPrimary,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.packs_count, packs.size, packs.sumOf { it.lines } / 1000),
+                style = MaterialTheme.typography.bodySmall,
+                color = AppColors.TextSecondary,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedButton(onClick = { game.refreshPacks(force = true) }, enabled = !updating) {
+                Icon(Icons.Rounded.Download, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(if (updating) R.string.packs_updating else R.string.packs_update))
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnlineEngineSection(game: GameTranslation, settings: AppSettings, onUpdate: ((AppSettings) -> AppSettings) -> Unit) {
+    val scope = rememberCoroutineScope()
+    val failure by game.onlineError.collectAsState()
+    Label(stringResource(R.string.engine_title))
+    Segmented(OnlineEngine.entries, settings.onlineEngine, { stringResource(it.label) }) { v -> onUpdate { it.copy(onlineEngine = v) } }
+    val engine = settings.onlineEngine
+    if (engine == OnlineEngine.NONE) {
+        Hint(stringResource(R.string.engine_none_desc))
+        return
+    }
+    Hint(stringResource(when (engine) {
+        OnlineEngine.GEMINI -> R.string.engine_gemini_desc
+        OnlineEngine.DEEPL -> R.string.engine_deepl_desc
+        OnlineEngine.OPENAI -> R.string.engine_openai_desc
+        else -> R.string.engine_claude_desc
+    }))
+
+    var key by remember(engine) { mutableStateOf(settings.apiKeys[engine.key].orEmpty()) }
+    var check by remember(engine) { mutableStateOf<OnlineKeyState?>(null) }
+    var checking by remember(engine) { mutableStateOf(false) }
+    Spacer(Modifier.height(8.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            value = key,
+            onValueChange = { key = it.trim(); check = null },
+            label = { Text(stringResource(R.string.engine_key)) },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(12.dp))
+        OutlinedButton(
+            onClick = {
+                checking = true
+                scope.launch {
+                    val state = game.checkKey(engine, key, settings.onlineModel)
+                    check = state
+                    checking = false
+                    // Keys that are valid (or valid but out of quota / model) are saved; wrong ones are not.
+                    if (KeyCheck.accepted(state)) onUpdate { it.copy(apiKeys = it.apiKeys + (engine.key to key)) }
+                }
+            },
+            enabled = key.isNotBlank() && !checking,
+        ) { Text(stringResource(if (checking) R.string.engine_checking else R.string.engine_check_save)) }
+    }
+    val state = check ?: failure
+    if (state != null) {
+        Hint(
+            stringResource(when (state) {
+                OnlineKeyState.VALID -> R.string.engine_state_valid
+                OnlineKeyState.INVALID -> R.string.engine_state_invalid
+                OnlineKeyState.QUOTA_EXCEEDED -> R.string.engine_state_quota
+                OnlineKeyState.MODEL_REJECTED -> R.string.engine_state_model
+                OnlineKeyState.UNREACHABLE -> R.string.engine_state_unreachable
+            }),
+            if (state == OnlineKeyState.VALID) AppColors.Success else AppColors.Danger,
+        )
+    } else if (settings.apiKeys[engine.key].isNullOrBlank()) {
+        Hint(stringResource(R.string.engine_key_missing), AppColors.Accent)
+    }
+
+    val models = game.modelsFor(engine)
+    if (models.isNotEmpty()) {
+        Label(stringResource(R.string.engine_model))
+        val selected = models.firstOrNull { it.id == settings.onlineModel } ?: models.first()
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            models.forEach { model ->
+                FilterChip(
+                    selected = model == selected,
+                    onClick = { onUpdate { it.copy(onlineModel = model.id) } },
+                    label = { Text(model.id + if (model.freeTier) " · " + stringResource(R.string.engine_free_tier) else "") },
+                    shape = RoundedCornerShape(12.dp),
+                )
             }
         }
     }

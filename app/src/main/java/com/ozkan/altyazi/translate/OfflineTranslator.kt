@@ -10,6 +10,9 @@ import com.google.mlkit.nl.translate.TranslatorOptions
 import com.ozkan.altyazi.data.Language
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import com.google.android.gms.tasks.Tasks
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -87,6 +90,16 @@ class OfflineTranslator(private val scope: CoroutineScope) : Closeable {
         return client.translate(text).await().also { cache.put(text, it) }
     }
 
+    /**
+     * Blocking variant for translation layers that run on their own thread (the CouchSubs sentence
+     * layer calls the engine once per sentence).
+     */
+    fun translateBlocking(text: String): String {
+        cache.get(text)?.let { return it }
+        val client = translator ?: throw IOException("Translator is not ready")
+        return Tasks.await(client.translate(text), BLOCKING_TIMEOUT_S, TimeUnit.SECONDS).also { cache.put(text, it) }
+    }
+
     private suspend fun check(client: Translator, pair: Pair<Language, Language>) = guard(client) {
         _state.value = ModelState.Checking
         val missing = missingModels(pair)
@@ -127,5 +140,6 @@ class OfflineTranslator(private val scope: CoroutineScope) : Closeable {
     companion object {
         const val PACK_SIZE_MB = 30
         private const val WARM_UP_TEXT = "Hello there."
+        private const val BLOCKING_TIMEOUT_S = 10L
     }
 }

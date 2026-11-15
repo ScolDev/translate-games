@@ -4,6 +4,19 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Game translation packs, AI model list and glossary from CouchSubs (git submodule, AGPL-3.0).
+val couchsubsResources = rootProject.file("third_party/couchsubs/core/Sources/CouchSubsCore/Resources")
+val couchsubsAssets = layout.buildDirectory.dir("generated/couchsubs-assets")
+val copyCouchSubsAssets by tasks.registering(Sync::class) {
+    from(couchsubsResources) { include("packs/*.json.gz", "ai-models.json", "glossary-en-tr.json") }
+    into(couchsubsAssets)
+    doFirst {
+        check(couchsubsResources.resolve("packs").isDirectory) {
+            "CouchSubs sources missing. Run: git submodule update --init --depth 1 third_party/couchsubs"
+        }
+    }
+}
+
 // CI run number becomes the version code, so every new APK installs over the previous one.
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 
@@ -66,6 +79,18 @@ android {
     }
     buildFeatures { compose = true }
 
+    sourceSets {
+        getByName("main").assets.srcDir(couchsubsAssets)
+    }
+
+    testOptions {
+        unitTests.all {
+            // CouchSubs' pack tests also run against the real packs when they are available.
+            it.systemProperty("couchsubs.packs", couchsubsResources.resolve("packs").absolutePath)
+            it.maxHeapSize = "2g"
+        }
+    }
+
     lint {
         abortOnError = false
         checkReleaseBuilds = false
@@ -113,4 +138,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
     testImplementation("junit:junit:4.13.2")
+    // Android's org.json is a stub in local unit tests; CouchSubs' parsers need the real one.
+    testImplementation("org.json:json:20240303")
 }
+
+tasks.named("preBuild") { dependsOn(copyCouchSubsAssets) }

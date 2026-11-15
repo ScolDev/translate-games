@@ -1,0 +1,19 @@
+Altyazı Çevirici (Subtitle Translator)
+Copyright (C) 2026 Özkan Eren
+https://github.com/ozknScalebor/translate-games
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU
+Affero General Public License version 3 (see LICENSE).
+
+It includes work from:
+
+- chiaki-ng (https://github.com/streetpea/chiaki-ng), AGPL-3.0 with an OpenSSL exception:
+  the Remote Play library (third_party/chiaki-ng) and, adapted, its Android JNI bridge and video
+  decoder (app/src/main/cpp).
+
+- CouchSubs by Sinan Yorulmaz (https://github.com/yorulmazsinan/couchsubs), AGPL-3.0:
+  the game translation packs, AI model list and glossary (third_party/couchsubs, copied into the
+  app at build time) and, modified on 2026-11-15 (package names, integration), its Android pack
+  lookup, fuzzy matching, sentence segmentation, translation cache, glossary, online translators and
+  pack store (app/src/main/java/com/ozkan/altyazi/couchsubs). See third_party/couchsubs/NOTICE and
+  third_party/couchsubs/THIRD-PARTY-NOTICES.md for the sources and licenses of the packs.

@@ -34,6 +34,8 @@ import com.ozkan.altyazi.ocr.SubtitleEnhancer
 import com.ozkan.altyazi.ocr.SubtitleOcr
 import com.ozkan.altyazi.remote.RemotePlayController
 import com.ozkan.altyazi.remote.StreamFrame
+import com.ozkan.altyazi.translate.GameTranslation
+import com.ozkan.altyazi.translate.LineOrigin
 import com.ozkan.altyazi.translate.ModelState
 import com.ozkan.altyazi.translate.OfflineTranslator
 import com.ozkan.altyazi.tts.Speaker
@@ -52,12 +54,12 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** One subtitle in the transcript. [refined] marks a line translated by the on-device AI. */
+/** One subtitle in the transcript and where its translation came from. */
 data class SubtitleLine(
     val id: Long,
     val original: String,
     val translated: String,
-    val refined: Boolean = false,
+    val origin: LineOrigin = LineOrigin.FAST,
 )
 
 /** Last subtitle's timings; [translateMs] is null when the line was translated by the AI. */
@@ -82,6 +84,8 @@ data class UiState(
     val focusMode: Boolean = false,
     val voiceMissing: Boolean = false,
     val aiState: AiState = AiState.Off,
+    /** Game recognized from its translation pack (CouchSubs packs); null until a pack line is seen. */
+    val packGame: String? = null,
     val showAiDownloadPrompt: Boolean = false,
 )
 
@@ -102,6 +106,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val stabilizer = SubtitleStabilizer()
     private val ai = AiTranslator(app, viewModelScope)
     val remote = RemotePlayController(app, viewModelScope)
+    /** Game packs, online engines and the improved ML Kit layer (from CouchSubs). */
+    val game = GameTranslation(app, viewModelScope)
     /** True while a stream frame is being read; newer frames are dropped meanwhile. */
     private val streamBusy = AtomicBoolean(false)
     @Volatile private var source: FrameSource? = null
@@ -191,6 +197,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         cameraManager.registerAvailabilityCallback(availabilityCallback, Handler(Looper.getMainLooper()))
         viewModelScope.launch { refreshCameras() }
         remote.frameSink = ::onStreamFrame
+        viewModelScope.launch { game.game.collect { title -> _ui.update { it.copy(packGame = title) } } }
     }
 
     // ---------- Source ----------
@@ -359,21 +366,52 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Translation order for a committed subtitle:
+     * 1. the game's translation pack (ready-made, reviewed, instant) for English → Turkish;
+     * 2. the online engine with the user's key, if one is set up;
+     * 3. the on-device AI (Gemma), if enabled;
+     * 4. ML Kit, through CouchSubs' sentence layer for English → Turkish.
+     */
     private fun onCommit(text: String, ocrMs: Long) {
         viewModelScope.launch {
             translateJob?.cancel() // a newer subtitle makes the pending translation obsolete
             aiJob?.cancel()
             val id = lineIdFor(text)
-            if (aiActive()) {
-                aiJob = launch { translateWithAi(id, text, ocrMs) }
-                return@launch
-            }
+            val s = settings
             translateJob = launch {
+                val started = SystemClock.elapsedRealtime()
+                if (s.gameTranslationPair && s.packsEnabled) {
+                    game.lookup(text)?.let { match ->
+                        present(id, text, match.text, LineOrigin.PACK, Metrics(ocrMs, SystemClock.elapsedRealtime() - started))
+                        return@launch
+                    }
+                }
+                if (s.gameTranslationPair && game.onlineConfigured(s)) {
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching { game.translateOnline(text, s, translator::translateBlocking) }.getOrNull()
+                    }
+                    if (result != null) {
+                        present(id, text, result.text, result.origin, Metrics(ocrMs, SystemClock.elapsedRealtime() - started))
+                        return@launch
+                    }
+                }
+                if (aiActive()) {
+                    translateWithAi(id, text, ocrMs)
+                    return@launch
+                }
                 val translated = translateFast(text) ?: return@launch
-                showLine(SubtitleLine(id, text, translated.first), Metrics(ocrMs, translated.second))
-                if (settings.speak) speaker.speak(translated.first)
+                present(id, text, translated.first, LineOrigin.FAST, Metrics(ocrMs, translated.second))
             }
         }
+    }
+
+    /** Shows a finished translation, keeps it as context for the AI and reads it aloud if enabled. */
+    private fun present(id: Long, text: String, translated: String, origin: LineOrigin, metrics: Metrics) {
+        showLine(SubtitleLine(id, text, translated, origin), metrics)
+        aiContext.addLast(AiPrompt.ContextLine(text, translated))
+        while (aiContext.size > AI_CONTEXT_LINES) aiContext.removeFirst()
+        if (settings.speak) speaker.speak(translated)
     }
 
     private fun aiActive() = settings.aiTranslation && ai.state.value is AiState.Ready
@@ -435,18 +473,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
         if (reply == null) {
             val fallback = translateFast(text) ?: return
-            showLine(SubtitleLine(id, text, fallback.first), Metrics(ocrMs, fallback.second))
-            if (s.speak) speaker.speak(fallback.first)
+            present(id, text, fallback.first, LineOrigin.FAST, Metrics(ocrMs, fallback.second))
             return
         }
 
-        val translated = speakerLine.format(reply)
         val aiMs = SystemClock.elapsedRealtime() - started
-        aiContext.addLast(AiPrompt.ContextLine(text, translated))
-        while (aiContext.size > AI_CONTEXT_LINES) aiContext.removeFirst()
-
-        showLine(SubtitleLine(id, text, translated, refined = true), Metrics(ocrMs, null, aiMs))
-        if (s.speak) speaker.speak(translated)
+        present(id, text, speakerLine.format(reply), LineOrigin.AI, Metrics(ocrMs, null, aiMs))
     }
 
     private fun com.ozkan.altyazi.data.Language.englishName(): String =
@@ -457,6 +489,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * converted to sentence case, and "- line - line" dialogue is translated line by line.
      */
     private suspend fun translate(text: String): String {
+        // English → Turkish goes through CouchSubs' sentence layer (glossary, context, cache).
+        if (settings.gameTranslationPair) return withContext(Dispatchers.IO) { game.translateFree(text, translator::translateBlocking) }
         val english = settings.sourceLanguage == Language.ENGLISH
         val line = SubtitleText.splitSpeaker(text)
         val parts = SubtitleText.splitDialogue(SubtitleText.toSentenceCase(line.body, english))

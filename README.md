@@ -13,6 +13,9 @@ Built for a PS5 → LG webOS TV setup, but it works with any screen and any cons
 - **Offline and accurate** — on-device OCR (model bundled in the APK) and on-device translation.
 - **Robust on busy scenes** — each frame is read twice: as captured and as a high-contrast copy that isolates white/yellow subtitle ink from colorful backgrounds. Reads from several frames are then voted on, so one garbled frame can't spoil a line. Digit/letter mix-ups (`1eave`, `G0D`) and ALL-CAPS text are fixed before translation, and `- line - line` dialogue is translated line by line.
 - **Dictionary repair (English)** — on real camera footage OCR gets nearly every letter right but drops word spaces (`sothey swallowthingswhole`, `upa tent`). A 126k-word frequency dictionary restores spacing and fixes one-letter typos instantly; on recorded TV footage this took most committed lines from ~96% to 100% character accuracy. The same dictionary helps pick the better OCR pass.
+- **Game translation packs** (from [CouchSubs](https://github.com/yorulmazsinan/couchsubs)) — ready-made, reviewed Turkish translations of Red Dead Redemption 2, GTA V, Elden Ring, Death Stranding 1 & 2, Marvel's Spider-Man 2, Assassin's Creed Shadows, Call of Duty: Modern Warfare (2019) and Mafia: The Old Country (about half a million lines). A line found in a pack appears instantly; OCR slips are tolerated and the game is recognized by itself. New packs are fetched from the CouchSubs pack server at most once a day. English → Turkish.
+- **Online translation (optional)** — Gemini (free key), DeepL (free key), OpenAI or Claude with your own key, for games without a pack. Off by default; only then does subtitle text leave the tablet. Failures fall back to the offline translation.
+- **Better offline translation** — English → Turkish ML Kit translation goes through CouchSubs' sentence layer: sentence splitting with context for short lines, a game glossary, idiom rewriting, informal address and a persistent cache.
 - **Optional AI translation (offline)** — Gemma 4 E2B (Apache-2.0, ~2.6 GB, downloaded once after consent) translates on the tablet via LiteRT-LM, on the GPU with CPU fallback. It writes more natural target-language text, silently fixes leftover OCR mistakes and gets the last few lines as context so names and tone stay consistent. Each line appears once, complete, when the model has finished; speculative decoding with Gemma 4's MTP drafter is enabled when supported, and subtitles are committed after 2 frames since the model fixes OCR mistakes itself. ML Kit is used only as a fallback if the AI fails. No internet, tokens or costs. Gemma 4 E2B was chosen as the best-scoring small local model in an independent game-text translation benchmark.
 - **Speed vs quality setting** — from *Instant* (~150 ms, single pass) to *Max* (~800 ms, 6-frame voting). Default: *Best* (~550 ms).
 - **Selectable languages** — game language: English, Turkish, German, French, Spanish, Italian, Portuguese, Dutch, Polish. Target language: any of those plus Russian, Arabic, Japanese, Korean and Chinese.
@@ -58,7 +61,8 @@ CameraX (1080p, keep-only-latest)            PS5 Remote Play (chiaki-ng, 1080p H
   → SpellingRepair     restore word spacing, fix typos (English dictionary); ReadScore picks the better pass
   → SubtitleStabilizer vote across frames, commit only stable, genuinely new lines
   → OfflineTranslator  sentence-case ALL CAPS, split dialogue, ML Kit Translate, LRU cache
-  → AiTranslator       optional: Gemma 4 E2B re-translates with context and replaces the line (AiPrompt checks the reply)
+  → GameTranslation    game pack → online engine (optional) → Gemma (optional) → ML Kit + CouchSubs sentence layer
+  → AiTranslator       optional: Gemma 4 E2B translates with context (AiPrompt checks the reply)
   → Compose UI (+ optional TextToSpeech)
 ```
 
@@ -69,6 +73,7 @@ CameraX (1080p, keep-only-latest)            PS5 Remote Play (chiaki-ng, 1080p H
 | `ocr` | On-device text recognition and high-contrast preprocessing |
 | `translate` | Language pack management and translation |
 | `ai` | Optional on-device LLM translation and model download |
+| `couchsubs` | Code adapted from CouchSubs: pack format and lookup, fuzzy matching, segmentation, cache, glossary, online engines |
 | `remote` | PS5 discovery, pairing, wake-up and streaming (Kotlin side of the JNI bridge in `app/src/main/cpp`) |
 | `tts` | Optional read-aloud |
 | `data` | Settings model and DataStore persistence |
@@ -81,7 +86,7 @@ CI builds every push to `main`, runs the unit tests and publishes the APK as the
 Locally (Android Studio Ladybug+ or JDK 17 with the Android SDK and NDK, `protoc`, and Python 3 with `protobuf`):
 
 ```bash
-git submodule update --init third_party/chiaki-ng
+git submodule update --init --depth 1 third_party/chiaki-ng third_party/couchsubs
 git -C third_party/chiaki-ng submodule update --init third-party/nanopb third-party/jerasure third-party/gf-complete third-party/curl
 ./gradlew testDebugUnitTest assembleRelease
 ```
@@ -93,6 +98,8 @@ The native part (`app/src/main/cpp`) builds chiaki-ng's protocol library with Op
 Builds are signed with `keystore/sideload.jks`, committed on purpose so every CI build has the same signature and updates install in place. It is meant for personal sideloading only. Before distributing the app more widely, generate a private key and move it to a GitHub secret.
 
 ## License and third-party code
+
+Game packs, the glossary, the AI model list and the pack, segmentation and online-translation code come from [CouchSubs](https://github.com/yorulmazsinan/couchsubs) by Sinan Yorulmaz (AGPL-3.0), modified on 2026-11-15 for this app; see `NOTICE`.
 
 Remote Play is built on [chiaki-ng](https://github.com/streetpea/chiaki-ng) (`third_party/chiaki-ng`, AGPL-3.0 with an OpenSSL exception); the JNI bridge in `app/src/main/cpp` and `remote/chiaki/Chiaki.kt` are adapted from its Android client. Because the app links this code, the app is distributed under the **GNU AGPL-3.0** (see `LICENSE`, which includes the OpenSSL exception). This project is not affiliated with Sony Interactive Entertainment; PlayStation and PS5 are trademarks of their owners.
 
