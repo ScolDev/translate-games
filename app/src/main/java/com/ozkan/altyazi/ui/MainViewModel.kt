@@ -35,6 +35,7 @@ import com.ozkan.altyazi.ocr.SubtitleOcr
 import com.ozkan.altyazi.remote.RemotePlayController
 import com.ozkan.altyazi.remote.StreamFrame
 import com.ozkan.altyazi.translate.GameTranslation
+import com.ozkan.altyazi.tv.TvLink
 import com.ozkan.altyazi.translate.LineOrigin
 import com.ozkan.altyazi.translate.ModelState
 import com.ozkan.altyazi.translate.OfflineTranslator
@@ -108,6 +109,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val remote = RemotePlayController(app, viewModelScope)
     /** Game packs, online engines and the improved ML Kit layer (from CouchSubs). */
     val game = GameTranslation(app, viewModelScope)
+    /** Translations on the TV, over the game (CouchSubs webOS app). */
+    val tv = TvLink(app, viewModelScope)
     /** True while a stream frame is being read; newer frames are dropped meanwhile. */
     private val streamBusy = AtomicBoolean(false)
     @Volatile private var source: FrameSource? = null
@@ -156,6 +159,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (first || previous.targetLanguage != s.targetLanguage) speaker.setLanguage(s.targetLanguage.key)
                 if (first || previous.speak != s.speak) speaker.setEnabled(s.speak)
+                tv.setEnabled(s.tvOutput, s)
                 if (first || previous.aiTranslation != s.aiTranslation) {
                     if (s.aiTranslation) ai.enable() else ai.disable()
                 }
@@ -336,7 +340,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         stabilizer.requiredHits = if (aiActive()) minOf(s.quality.requiredReads, AI_REQUIRED_READS) else s.quality.requiredReads
         when (val event = stabilizer.accept(if (SubtitleText.isMeaningful(read.text)) read else Read.EMPTY)) {
             is SubtitleStabilizer.Event.Commit -> onCommit(event.text, ocrMs)
-            SubtitleStabilizer.Event.Cleared -> _ui.update { it.copy(subtitleOnScreen = false) }
+            SubtitleStabilizer.Event.Cleared -> {
+                _ui.update { it.copy(subtitleOnScreen = false) }
+                tv.clear()
+            }
             null -> Unit
         }
     }
@@ -409,6 +416,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Shows a finished translation, keeps it as context for the AI and reads it aloud if enabled. */
     private fun present(id: Long, text: String, translated: String, origin: LineOrigin, metrics: Metrics) {
         showLine(SubtitleLine(id, text, translated, origin), metrics)
+        tv.subtitle(translated)
         aiContext.addLast(AiPrompt.ContextLine(text, translated))
         while (aiContext.size > AI_CONTEXT_LINES) aiContext.removeFirst()
         if (settings.speak) speaker.speak(translated)
@@ -555,6 +563,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         remote.frameSink = null
         remote.close()
+        tv.close()
         cameraManager.unregisterAvailabilityCallback(availabilityCallback)
         analysisExecutor.shutdown()
         ocr.close()

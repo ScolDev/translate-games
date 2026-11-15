@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
@@ -75,6 +76,9 @@ import com.ozkan.altyazi.data.OnlineEngine
 import com.ozkan.altyazi.couchsubs.translation.KeyCheck
 import com.ozkan.altyazi.couchsubs.translation.OnlineKeyState
 import com.ozkan.altyazi.translate.GameTranslation
+import com.ozkan.altyazi.tv.TvLink
+import com.ozkan.altyazi.data.TvPlacement
+import com.ozkan.altyazi.data.TvTextSize
 import com.ozkan.altyazi.data.PanelBackground
 import com.ozkan.altyazi.data.Quality
 import com.ozkan.altyazi.data.SubtitleFont
@@ -91,6 +95,8 @@ private enum class AppLanguage(val tag: String, val label: Int) {
 @Composable
 fun SettingsSheet(
     game: GameTranslation,
+    tv: TvLink,
+    onInstallTv: () -> Unit,
     packGame: String?,
     settings: AppSettings,
     voiceMissing: Boolean,
@@ -140,6 +146,10 @@ fun SettingsSheet(
             if (!settings.gameTranslationPair) Hint(stringResource(R.string.quality_pair_only), AppColors.Accent)
             GamePacksSection(game, packGame, settings, onUpdate)
             OnlineEngineSection(game, settings, onUpdate)
+
+            // ---------- TV ----------
+            Group(stringResource(R.string.tv_group))
+            TvSection(tv, settings, onUpdate, onInstallTv)
 
             // ---------- Appearance ----------
             Group(stringResource(R.string.settings_appearance))
@@ -226,6 +236,40 @@ fun SettingsSheet(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TvSection(tv: TvLink, settings: AppSettings, onUpdate: ((AppSettings) -> AppSettings) -> Unit, onInstallTv: () -> Unit) {
+    val connected by tv.connected.collectAsState()
+    val serverError by tv.serverError.collectAsState()
+    SwitchRow(stringResource(R.string.tv_output), settings.tvOutput) { v -> onUpdate { it.copy(tvOutput = v) } }
+    Hint(stringResource(R.string.tv_output_desc))
+    if (settings.tvOutput) {
+        Hint(
+            when {
+                serverError -> stringResource(R.string.tv_status_port)
+                connected > 0 -> stringResource(R.string.tv_status_connected)
+                settings.tvHost == null -> stringResource(R.string.tv_status_not_installed)
+                else -> stringResource(R.string.tv_status_waiting)
+            },
+            when {
+                serverError -> AppColors.Danger
+                connected > 0 -> AppColors.Success
+                else -> AppColors.Accent
+            },
+        )
+        Label(stringResource(R.string.tv_size))
+        Segmented(TvTextSize.entries, settings.tvTextSize, { stringResource(it.label) }) { v -> onUpdate { it.copy(tvTextSize = v) } }
+        Label(stringResource(R.string.tv_place))
+        Segmented(TvPlacement.entries, settings.tvPlacement, { stringResource(it.label) }) { v -> onUpdate { it.copy(tvPlacement = v) } }
+        Hint(stringResource(R.string.tv_style_hint))
+    }
+    Spacer(Modifier.height(10.dp))
+    OutlinedButton(onClick = onInstallTv) {
+        Icon(Icons.Rounded.Tv, null, Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(if (settings.tvHost == null) R.string.tv_install_open else R.string.tv_install_update))
     }
 }
 

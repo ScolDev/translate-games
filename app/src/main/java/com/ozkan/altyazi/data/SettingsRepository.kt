@@ -42,6 +42,10 @@ class SettingsRepository(context: Context) {
         val roiBottom = floatPreferencesKey("roi_bottom")
         val cameraId = stringPreferencesKey("camera_id")
         val packsEnabled = booleanPreferencesKey("packs_enabled")
+        val tvOutput = booleanPreferencesKey("tv_output")
+        val tvHost = stringPreferencesKey("tv_host")
+        val tvTextSize = stringPreferencesKey("tv_text_size")
+        val tvPlacement = stringPreferencesKey("tv_placement")
         val onlineEngine = stringPreferencesKey("online_engine")
         val onlineModel = stringPreferencesKey("online_model")
         fun apiKey(engine: OnlineEngine) = stringPreferencesKey("api_key_" + engine.key)
@@ -96,6 +100,10 @@ class SettingsRepository(context: Context) {
             streamRoi = streamRoi,
             cameraId = this[Keys.cameraId],
             packsEnabled = this[Keys.packsEnabled] ?: d.packsEnabled,
+            tvOutput = this[Keys.tvOutput] ?: d.tvOutput,
+            tvHost = this[Keys.tvHost],
+            tvTextSize = keyedValueOf(this[Keys.tvTextSize], d.tvTextSize),
+            tvPlacement = keyedValueOf(this[Keys.tvPlacement], d.tvPlacement),
             onlineEngine = keyedValueOf(this[Keys.onlineEngine], d.onlineEngine),
             onlineModel = this[Keys.onlineModel],
             apiKeys = OnlineEngine.entries.mapNotNull { e -> this[Keys.apiKey(e)]?.let { e.key to it } }.toMap(),
@@ -124,6 +132,10 @@ class SettingsRepository(context: Context) {
         this[Keys.streamRoiBottom] = s.streamRoi.bottom
         if (s.cameraId != null) this[Keys.cameraId] = s.cameraId else remove(Keys.cameraId)
         this[Keys.packsEnabled] = s.packsEnabled
+        this[Keys.tvOutput] = s.tvOutput
+        if (s.tvHost != null) this[Keys.tvHost] = s.tvHost else remove(Keys.tvHost)
+        this[Keys.tvTextSize] = s.tvTextSize.key
+        this[Keys.tvPlacement] = s.tvPlacement.key
         this[Keys.onlineEngine] = s.onlineEngine.key
         if (s.onlineModel != null) this[Keys.onlineModel] = s.onlineModel else remove(Keys.onlineModel)
         OnlineEngine.entries.forEach { e ->

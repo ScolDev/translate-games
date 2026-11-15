@@ -82,6 +82,21 @@ enum class OnlineEngine(override val key: String, @StringRes val label: Int, val
     CLAUDE("claude", R.string.engine_claude, "claude"),
 }
 
+/** Subtitle size on the TV (CouchSubs TV app: pixels on a 1080p screen). */
+enum class TvTextSize(override val key: String, @StringRes val label: Int, val px: Int) : Keyed {
+    SMALL("small", R.string.tv_size_small, 36),
+    MEDIUM("medium", R.string.tv_size_medium, 46),
+    LARGE("large", R.string.tv_size_large, 58),
+    HUGE("huge", R.string.tv_size_huge, 72),
+}
+
+/** Where the translation sits relative to the game's own English subtitle on the TV. */
+enum class TvPlacement(override val key: String, @StringRes val label: Int) : Keyed {
+    COVER("cover", R.string.tv_place_cover),
+    ABOVE("above", R.string.tv_place_above),
+    BELOW("below", R.string.tv_place_below),
+}
+
 /** Normalized (0..1) subtitle region relative to the camera frame or the streamed picture. */
 data class Roi(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val width get() = right - left
@@ -115,6 +130,12 @@ data class AppSettings(
     val onlineModel: String? = null,
     /** API keys by [OnlineEngine.key]; kept in app-private storage only. */
     val apiKeys: Map<String, String> = emptyMap(),
+    /** Also show the translations on the TV, over the game (CouchSubs webOS app). */
+    val tvOutput: Boolean = false,
+    /** Address of the LG TV the TV app was installed on. */
+    val tvHost: String? = null,
+    val tvTextSize: TvTextSize = TvTextSize.MEDIUM,
+    val tvPlacement: TvPlacement = TvPlacement.COVER,
     val sourceLanguage: Language = Language.ENGLISH,
     val targetLanguage: Language = Language.TURKISH,
     val quality: Quality = Quality.BEST,

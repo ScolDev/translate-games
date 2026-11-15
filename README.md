@@ -13,6 +13,7 @@ Built for a PS5 → LG webOS TV setup, but it works with any screen and any cons
 - **Offline and accurate** — on-device OCR (model bundled in the APK) and on-device translation.
 - **Robust on busy scenes** — each frame is read twice: as captured and as a high-contrast copy that isolates white/yellow subtitle ink from colorful backgrounds. Reads from several frames are then voted on, so one garbled frame can't spoil a line. Digit/letter mix-ups (`1eave`, `G0D`) and ALL-CAPS text are fixed before translation, and `- line - line` dialogue is translated line by line.
 - **Dictionary repair (English)** — on real camera footage OCR gets nearly every letter right but drops word spaces (`sothey swallowthingswhole`, `upa tent`). A 126k-word frequency dictionary restores spacing and fixes one-letter typos instantly; on recorded TV footage this took most committed lines from ~96% to 100% character accuracy. The same dictionary helps pick the better OCR pass.
+- **Subtitles on the TV, over the game** — with the [CouchSubs](https://github.com/yorulmazsinan/couchsubs) LG webOS app: the TV shows the PS5's HDMI picture with the Turkish subtitle on top, and the tablet sends each translation over Wi-Fi. The app installs the TV app itself through LG Developer Mode (one-time passphrase), opens it with the tablet's address and renews the Developer Mode session once a day. Size and position are adjustable.
 - **Game translation packs** (from [CouchSubs](https://github.com/yorulmazsinan/couchsubs)) — ready-made, reviewed Turkish translations of Red Dead Redemption 2, GTA V, Elden Ring, Death Stranding 1 & 2, Marvel's Spider-Man 2, Assassin's Creed Shadows, Call of Duty: Modern Warfare (2019) and Mafia: The Old Country (about half a million lines). A line found in a pack appears instantly; OCR slips are tolerated and the game is recognized by itself. New packs are fetched from the CouchSubs pack server at most once a day. English → Turkish.
 - **Online translation (optional)** — Gemini (free key), DeepL (free key), OpenAI or Claude with your own key, for games without a pack. Off by default; only then does subtitle text leave the tablet. Failures fall back to the offline translation.
 - **Better offline translation** — English → Turkish ML Kit translation goes through CouchSubs' sentence layer: sentence splitting with context for short lines, a game glossary, idiom rewriting, informal address and a persistent cache.
@@ -91,6 +92,8 @@ git -C third_party/chiaki-ng submodule update --init third-party/nanopb third-pa
 ./gradlew testDebugUnitTest assembleRelease
 ```
 
+The LG TV app package is made with LG's tool before the Android build (`npm install -g @webos-tools/cli`, then `./scripts/package-tv.sh`); without it the app builds but cannot install the TV app.
+
 The native part (`app/src/main/cpp`) builds chiaki-ng's protocol library with OpenSSL, json-c and miniupnpc fetched at build time.
 
 ### Signing
@@ -99,7 +102,7 @@ Builds are signed with `keystore/sideload.jks`, committed on purpose so every CI
 
 ## License and third-party code
 
-Game packs, the glossary, the AI model list and the pack, segmentation and online-translation code come from [CouchSubs](https://github.com/yorulmazsinan/couchsubs) by Sinan Yorulmaz (AGPL-3.0), modified on 2026-11-15 for this app; see `NOTICE`.
+The LG TV app (`third_party/couchsubs/tv-webos`), its subtitle server protocol and the LG installer, game packs, the glossary, the AI model list and the pack, segmentation and online-translation code come from [CouchSubs](https://github.com/yorulmazsinan/couchsubs) by Sinan Yorulmaz (AGPL-3.0), modified on 2026-11-15 for this app; see `NOTICE`.
 
 Remote Play is built on [chiaki-ng](https://github.com/streetpea/chiaki-ng) (`third_party/chiaki-ng`, AGPL-3.0 with an OpenSSL exception); the JNI bridge in `app/src/main/cpp` and `remote/chiaki/Chiaki.kt` are adapted from its Android client. Because the app links this code, the app is distributed under the **GNU AGPL-3.0** (see `LICENSE`, which includes the OpenSSL exception). This project is not affiliated with Sony Interactive Entertainment; PlayStation and PS5 are trademarks of their owners.
 

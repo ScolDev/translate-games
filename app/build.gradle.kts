@@ -9,6 +9,8 @@ val couchsubsResources = rootProject.file("third_party/couchsubs/core/Sources/Co
 val couchsubsAssets = layout.buildDirectory.dir("generated/couchsubs-assets")
 val copyCouchSubsAssets by tasks.registering(Sync::class) {
     from(couchsubsResources) { include("packs/*.json.gz", "ai-models.json", "glossary-en-tr.json") }
+    // The LG TV app package made by scripts/package-tv.sh (CouchSubs tv-webos, LG ares-package).
+    from(rootProject.file("build/tv-app")) { include("couchsubs-lg.ipk", "tv-packages.properties"); into("tv") }
     into(couchsubsAssets)
     doFirst {
         check(couchsubsResources.resolve("packs").isDirectory) {
@@ -96,7 +98,7 @@ android {
         checkReleaseBuilds = false
     }
     packaging {
-        resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+        resources { excludes += listOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/versions/9/OSGI-INF/MANIFEST.MF") }
     }
 }
 
@@ -140,6 +142,10 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     // Android's org.json is a stub in local unit tests; CouchSubs' parsers need the real one.
     testImplementation("org.json:json:20240303")
+    testImplementation("org.bouncycastle:bcpkix-jdk18on:1.79")
+
+    // TV app installation over LG Developer Mode SSH (mwiede/jsch, BSD).
+    implementation("com.github.mwiede:jsch:0.2.25")
 }
 
 tasks.named("preBuild") { dependsOn(copyCouchSubsAssets) }

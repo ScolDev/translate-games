@@ -12,8 +12,9 @@ It includes work from:
   decoder (app/src/main/cpp).
 
 - CouchSubs by Sinan Yorulmaz (https://github.com/yorulmazsinan/couchsubs), AGPL-3.0:
-  the game translation packs, AI model list and glossary (third_party/couchsubs, copied into the
-  app at build time) and, modified on 2026-11-15 (package names, integration), its Android pack
-  lookup, fuzzy matching, sentence segmentation, translation cache, glossary, online translators and
+  the LG webOS TV app (third_party/couchsubs/tv-webos, packaged at build time), the game
+  translation packs, AI model list and glossary (third_party/couchsubs, copied into the
+  app at build time) and, modified on 2026-11-15 (package names, integration), its Android subtitle server, LG
+  Developer Mode installer, TV discovery, pack lookup, fuzzy matching, sentence segmentation, translation cache, glossary, online translators and
   pack store (app/src/main/java/com/ozkan/altyazi/couchsubs). See third_party/couchsubs/NOTICE and
   third_party/couchsubs/THIRD-PARTY-NOTICES.md for the sources and licenses of the packs.

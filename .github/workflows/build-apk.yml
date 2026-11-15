@@ -41,6 +41,12 @@ jobs:
           chmod +x "$HOME/bin/protoc"
           echo "$HOME/bin" >> "$GITHUB_PATH"
 
+      - name: Package the LG TV app
+        run: |
+          # CouchSubs' webOS app, packaged with LG's own tool; the Android app installs it on the TV.
+          npm install -g --no-audit --no-fund @webos-tools/cli@3
+          ./scripts/package-tv.sh
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin

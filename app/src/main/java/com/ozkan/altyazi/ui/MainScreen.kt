@@ -149,6 +149,7 @@ private fun remoteActionsFor(viewModel: MainViewModel) = object : RemotePlayActi
 @Composable
 private fun TranslatorLayout(state: UiState, viewModel: MainViewModel, streamingFrom: String?) {
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var tvInstallOpen by rememberSaveable { mutableStateOf(false) }
     val remoteMode = streamingFrom != null
 
     // The picture card is movable content: switching between the split and fullscreen layouts moves
@@ -204,6 +205,8 @@ private fun TranslatorLayout(state: UiState, viewModel: MainViewModel, streaming
     if (settingsOpen) {
         SettingsSheet(
             game = viewModel.game,
+            tv = viewModel.tv,
+            onInstallTv = { tvInstallOpen = true },
             packGame = state.packGame,
             settings = state.settings,
             voiceMissing = state.voiceMissing,
@@ -214,6 +217,15 @@ private fun TranslatorLayout(state: UiState, viewModel: MainViewModel, streaming
             onResetRoi = viewModel::resetRoi,
             onClearHistory = viewModel::clearHistory,
             onDismiss = { settingsOpen = false },
+        )
+    }
+
+    if (tvInstallOpen) {
+        TvInstallDialog(
+            tv = viewModel.tv,
+            savedHost = state.settings.tvHost,
+            onInstalled = { host -> viewModel.updateSettings { it.copy(tvHost = host, tvOutput = true) } },
+            onDismiss = { tvInstallOpen = false },
         )
     }
 }
