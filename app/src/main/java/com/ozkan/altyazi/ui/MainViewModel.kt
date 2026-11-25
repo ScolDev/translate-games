@@ -158,7 +158,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     stabilizer.reset()
                 }
                 if (first || previous.targetLanguage != s.targetLanguage) speaker.setLanguage(s.targetLanguage.key)
+                speaker.setRate(s.speechRate)
+                speaker.setQueueMode(s.queueSpeech)
                 if (first || previous.speak != s.speak) speaker.setEnabled(s.speak)
+                if (!first && s.interruptsSpeech(previous)) speaker.stop()
                 tv.setEnabled(s.tvOutput, s)
                 if (first || previous.aiTranslation != s.aiTranslation) {
                     if (s.aiTranslation) ai.enable() else ai.disable()
@@ -210,6 +213,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun selectSource(value: FrameSource?) {
         if (value == source) return
         source = value
+        speaker.stop()
         stabilizer.reset()
         if (value == FrameSource.REMOTE_PLAY) remote.startDiscovery() else remote.close()
         _ui.update { it.copy(source = value, subtitleOnScreen = false, metrics = null) }
@@ -545,7 +549,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         ai.enable()
     }
 
-    fun clearHistory() = _ui.update { it.copy(lines = emptyList(), subtitleOnScreen = false) }
+    fun clearHistory() {
+        speaker.stop()
+        _ui.update { it.copy(lines = emptyList(), subtitleOnScreen = false) }
+    }
 
     fun confirmDownload() {
         _ui.update { it.copy(showDownloadPrompt = false) }
