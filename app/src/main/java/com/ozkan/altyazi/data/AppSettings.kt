@@ -121,6 +121,11 @@ data class AppSettings(
     val background: PanelBackground = PanelBackground.SOFT,
     val showOriginal: Boolean = true,
     val speak: Boolean = false,
+    /** Read-aloud appends lines to the speech queue instead of cutting the current speech. */
+    val queueSpeech: Boolean = false,
+    val speechRate: Float = DEFAULT_SPEECH_RATE,
+    /** Off = passthrough: the source text is shown and spoken as is, with no translation work. */
+    val translationEnabled: Boolean = true,
     /** Optional offline AI translation with an on-device LLM (off by default). */
     val aiTranslation: Boolean = false,
     /** Ready-made game translations (CouchSubs packs), used first for English → Turkish. */
@@ -149,6 +154,18 @@ data class AppSettings(
     /** Pack and CouchSubs translation layers cover English → Turkish, the pair they were built for. */
     val gameTranslationPair: Boolean get() = sourceLanguage == Language.ENGLISH && targetLanguage == Language.TURKISH
 
+    /** Language the read-aloud voice speaks: the translation, or the source text in passthrough. */
+    val speechLanguage: Language get() = if (translationEnabled) targetLanguage else sourceLanguage
+
+    val translationRequired: Boolean get() = translationEnabled
+
+    /** True when moving from [previous] to this must stop the current speech and empty the queue. */
+    fun interruptsSpeech(previous: AppSettings): Boolean =
+        speechLanguage != previous.speechLanguage ||
+            sourceLanguage != previous.sourceLanguage || targetLanguage != previous.targetLanguage ||
+            translationEnabled != previous.translationEnabled ||
+            (previous.speak && !speak) || (previous.queueSpeech && !queueSpeech)
+
     override fun toString(): String = "AppSettings(engine=${onlineEngine.key}, packs=$packsEnabled, ai=$aiTranslation, " +
         "${sourceLanguage.key}->${targetLanguage.key})" // never print API keys
 
@@ -175,6 +192,17 @@ data class AppSettings(
     companion object {
         const val MIN_TEXT_SP = 20f
         const val MAX_TEXT_SP = 80f
+
+        const val MIN_SPEECH_RATE = 0.5f
+        const val MAX_SPEECH_RATE = 2.0f
+        const val DEFAULT_SPEECH_RATE = 1.1f
+        /** Slider steps between the bounds, so every position is a multiple of 0.1. */
+        const val SPEECH_RATE_STEPS = 14
+
+        /** Clamps to the allowed range and rounds to 0.1; a non-finite value falls back to the default. */
+        fun coerceSpeechRate(value: Float): Float =
+            if (!value.isFinite()) DEFAULT_SPEECH_RATE
+            else Math.round(value.coerceIn(MIN_SPEECH_RATE, MAX_SPEECH_RATE) * 10f) / 10f
 
         /** Soft tones chosen for long reading sessions next to a TV. */
         val TEXT_COLORS: List<Long> = listOf(
