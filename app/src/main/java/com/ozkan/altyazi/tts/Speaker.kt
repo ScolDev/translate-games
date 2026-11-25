@@ -2,6 +2,8 @@ package com.ozkan.altyazi.tts
 
 import android.content.Context
 import android.speech.tts.TextToSpeech
+import com.ozkan.altyazi.core.SpeechQueuePolicy
+import com.ozkan.altyazi.data.AppSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +20,10 @@ class Speaker(context: Context) {
     private var engineReady = false
     private var locale: Locale = Locale.forLanguageTag("tr-TR")
     private var voiceReady = false
+    private val policy = SpeechQueuePolicy()
+    private var queueMode = false
+    private var rate = AppSettings.DEFAULT_SPEECH_RATE
+    private var utteranceSeq = 0L
 
     /** null = unknown yet, false = no voice for the selected language */
     private val _voiceAvailable = MutableStateFlow<Boolean?>(null)
@@ -37,12 +43,28 @@ class Speaker(context: Context) {
         if (engineReady) applyLocale()
     }
 
-    fun speak(text: String) {
-        if (voiceReady) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "subtitle")
+    /** Queue mode appends lines instead of cutting the current speech. Main thread only. */
+    fun setQueueMode(enabled: Boolean) {
+        queueMode = enabled
     }
 
+    /** Applies to utterances spoken from now on; already queued ones keep their rate. */
+    fun setRate(value: Float) {
+        rate = value
+        tts?.setSpeechRate(rate)
+    }
+
+    fun speak(text: String) {
+        if (!voiceReady) return
+        val utterance = policy.next(text, queueMode) ?: return
+        val queue = if (utterance.mode == SpeechQueuePolicy.Mode.ADD) TextToSpeech.QUEUE_ADD else TextToSpeech.QUEUE_FLUSH
+        tts?.speak(utterance.text, queue, null, "subtitle-${utteranceSeq++}")
+    }
+
+    /** Stops the current speech, drops everything queued and forgets the last spoken text. */
     fun stop() {
         tts?.stop()
+        policy.reset()
     }
 
     fun shutdown() {
@@ -55,7 +77,7 @@ class Speaker(context: Context) {
     private fun applyLocale() {
         val engine = tts ?: return
         voiceReady = engine.setLanguage(locale) >= TextToSpeech.LANG_AVAILABLE
-        engine.setSpeechRate(1.1f)
+        engine.setSpeechRate(rate)
         _voiceAvailable.value = voiceReady
     }
 }

@@ -33,6 +33,9 @@ class SettingsRepository(context: Context) {
         val showOriginal = booleanPreferencesKey("show_original")
         val speak = booleanPreferencesKey("speak")
         val aiTranslation = booleanPreferencesKey("ai_translation")
+        val translationEnabled = booleanPreferencesKey("translation_enabled")
+        val queueSpeech = booleanPreferencesKey("queue_speech")
+        val speechRate = floatPreferencesKey("speech_rate")
         val sourceLanguage = stringPreferencesKey("source_language")
         val targetLanguage = stringPreferencesKey("target_language")
         val quality = stringPreferencesKey("quality")
@@ -93,6 +96,9 @@ class SettingsRepository(context: Context) {
             showOriginal = this[Keys.showOriginal] ?: d.showOriginal,
             speak = this[Keys.speak] ?: d.speak,
             aiTranslation = this[Keys.aiTranslation] ?: d.aiTranslation,
+            translationEnabled = this[Keys.translationEnabled] ?: d.translationEnabled,
+            queueSpeech = this[Keys.queueSpeech] ?: d.queueSpeech,
+            speechRate = AppSettings.coerceSpeechRate(this[Keys.speechRate] ?: d.speechRate),
             sourceLanguage = source,
             targetLanguage = target,
             quality = keyedValueOf(this[Keys.quality], d.quality),
@@ -119,6 +125,9 @@ class SettingsRepository(context: Context) {
         this[Keys.showOriginal] = s.showOriginal
         this[Keys.speak] = s.speak
         this[Keys.aiTranslation] = s.aiTranslation
+        this[Keys.translationEnabled] = s.translationEnabled
+        this[Keys.queueSpeech] = s.queueSpeech
+        this[Keys.speechRate] = s.speechRate
         this[Keys.sourceLanguage] = s.sourceLanguage.key
         this[Keys.targetLanguage] = s.targetLanguage.key
         this[Keys.quality] = s.quality.key

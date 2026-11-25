@@ -141,13 +141,13 @@ private fun Transcript(
                     val style = if (isCurrent) settings.subtitleStyle()
                     else settings.subtitleStyle(HISTORY_SCALE).copy(shadow = null)
                     Text(line.translated, style = style, modifier = Modifier.fillMaxWidth())
-                    if (settings.showOriginal) {
+                    if (settings.showOriginal && line.origin != LineOrigin.ORIGINAL) {
                         Spacer(Modifier.height(if (isCurrent) 12.dp else 4.dp))
                         Text(
                             when (line.origin) {
                                 LineOrigin.PACK -> "◆ ${line.original}"   // ready-made game translation
                                 LineOrigin.AI, LineOrigin.ONLINE -> "✦ ${line.original}"
-                                LineOrigin.FAST -> line.original
+                                LineOrigin.FAST, LineOrigin.ORIGINAL -> line.original
                             },
                             style = TextStyle(
                                 fontSize = (settings.textSizeSp * if (isCurrent) 0.42f else 0.3f).coerceAtLeast(12f).sp,

@@ -61,6 +61,12 @@
     <string name="settings_response">Hız ve kalite</string>
     <string name="settings_show_original">Orijinal metni göster</string>
     <string name="settings_speak">Çeviriyi sesli oku</string>
+    <string name="settings_translate">Altyazıları çevir</string>
+    <string name="settings_translate_hint">Kapalı: altyazı çevrilmeden, kendi dilinde gösterilir ve sesli okunur.</string>
+    <string name="settings_queue_speech">Konuşmayı sıraya al</string>
+    <string name="settings_queue_speech_hint">Yeni satırlar mevcut konuşmayı kesmez, sırasını bekler. Ses ekranın gerisinde kalabilir.</string>
+    <string name="settings_speech_rate">Konuşma hızı</string>
+    <string name="speech_rate_value">%1$.1fx</string>
     <string name="settings_voice_missing">%1$s ses yüklü değil. Ayarlar › Genel yönetim › Metin okuma çıkışı bölümünden yükleyin.</string>
     <string name="settings_reset_roi">Altyazı bölgesini sıfırla</string>
     <string name="settings_app_language">Uygulama dili</string>

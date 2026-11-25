@@ -122,30 +122,37 @@ fun SettingsSheet(
 
             // ---------- Translation ----------
             Group(stringResource(R.string.settings_translation))
+            SwitchRow(stringResource(R.string.settings_translate), settings.translationEnabled) { v ->
+                onUpdate { it.copy(translationEnabled = v) }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Label(stringResource(R.string.settings_source))
                     LanguageChips(Language.sources, settings.sourceLanguage) { lang -> onUpdate { it.withSource(lang) } }
                 }
-                FilledTonalIconButton(
-                    onClick = { onUpdate { it.swapped() } },
-                    enabled = settings.targetLanguage.ocrSupported,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                ) {
-                    Icon(Icons.Rounded.SwapHoriz, stringResource(R.string.settings_swap))
-                }
-                Column(Modifier.weight(1f)) {
-                    Label(stringResource(R.string.settings_target))
-                    LanguageChips(Language.targets, settings.targetLanguage) { lang -> onUpdate { it.withTarget(lang) } }
+                if (settings.translationEnabled) {
+                    FilledTonalIconButton(
+                        onClick = { onUpdate { it.swapped() } },
+                        enabled = settings.targetLanguage.ocrSupported,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    ) {
+                        Icon(Icons.Rounded.SwapHoriz, stringResource(R.string.settings_swap))
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Label(stringResource(R.string.settings_target))
+                        LanguageChips(Language.targets, settings.targetLanguage) { lang -> onUpdate { it.withTarget(lang) } }
+                    }
                 }
             }
-            Hint(stringResource(R.string.settings_lang_hint))
+            Hint(stringResource(if (settings.translationEnabled) R.string.settings_lang_hint else R.string.settings_translate_hint))
 
             // ---------- Translation quality (CouchSubs packs and engines) ----------
-            Group(stringResource(R.string.quality_group))
-            if (!settings.gameTranslationPair) Hint(stringResource(R.string.quality_pair_only), AppColors.Accent)
-            GamePacksSection(game, packGame, settings, onUpdate)
-            OnlineEngineSection(game, settings, onUpdate)
+            if (settings.translationEnabled) {
+                Group(stringResource(R.string.quality_group))
+                if (!settings.gameTranslationPair) Hint(stringResource(R.string.quality_pair_only), AppColors.Accent)
+                GamePacksSection(game, packGame, settings, onUpdate)
+                OnlineEngineSection(game, settings, onUpdate)
+            }
 
             // ---------- TV ----------
             Group(stringResource(R.string.tv_group))
@@ -211,13 +218,38 @@ fun SettingsSheet(
             SwitchRow(stringResource(R.string.settings_show_original), settings.showOriginal) { v -> onUpdate { it.copy(showOriginal = v) } }
             SwitchRow(stringResource(R.string.settings_speak), settings.speak) { v -> onUpdate { it.copy(speak = v) } }
             if (settings.speak && voiceMissing) {
-                Hint(stringResource(R.string.settings_voice_missing, stringResource(settings.targetLanguage.label)), AppColors.Danger)
+                Hint(stringResource(R.string.settings_voice_missing, stringResource(settings.speechLanguage.label)), AppColors.Danger)
+            }
+            if (settings.speak) {
+                SwitchRow(stringResource(R.string.settings_queue_speech), settings.queueSpeech) { v -> onUpdate { it.copy(queueSpeech = v) } }
+                Hint(stringResource(R.string.settings_queue_speech_hint))
+                Label(stringResource(R.string.settings_speech_rate))
+                var rate by remember { mutableFloatStateOf(settings.speechRate) }
+                LaunchedEffect(settings.speechRate) { rate = settings.speechRate }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Slider(
+                        value = rate,
+                        onValueChange = { rate = it },
+                        onValueChangeFinished = { onUpdate { s -> s.copy(speechRate = AppSettings.coerceSpeechRate(rate)) } },
+                        valueRange = AppSettings.MIN_SPEECH_RATE..AppSettings.MAX_SPEECH_RATE,
+                        steps = AppSettings.SPEECH_RATE_STEPS,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Text(
+                        stringResource(R.string.speech_rate_value, AppSettings.coerceSpeechRate(rate)),
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.width(56.dp),
+                    )
+                }
             }
 
-            Spacer(Modifier.height(8.dp))
-            SwitchRow(stringResource(R.string.ai_title), settings.aiTranslation) { v -> onUpdate { it.copy(aiTranslation = v) } }
-            Hint(stringResource(R.string.ai_desc))
-            if (settings.aiTranslation) AiStatus(aiState, onAiDownload, onAiRetry)
+            if (settings.translationEnabled) {
+                Spacer(Modifier.height(8.dp))
+                SwitchRow(stringResource(R.string.ai_title), settings.aiTranslation) { v -> onUpdate { it.copy(aiTranslation = v) } }
+                Hint(stringResource(R.string.ai_desc))
+                if (settings.aiTranslation) AiStatus(aiState, onAiDownload, onAiRetry)
+            }
 
             Label(stringResource(R.string.settings_app_language))
             AppLanguagePicker()
