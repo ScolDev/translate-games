@@ -68,6 +68,12 @@
     <string name="settings_response">Speed vs quality</string>
     <string name="settings_show_original">Show original text</string>
     <string name="settings_speak">Read translations aloud</string>
+    <string name="settings_translate">Translate subtitles</string>
+    <string name="settings_translate_hint">Off: the subtitle is shown and read aloud in its own language, with no translation.</string>
+    <string name="settings_queue_speech">Queue speech</string>
+    <string name="settings_queue_speech_hint">New lines wait their turn instead of cutting the current speech. The voice can fall behind the screen.</string>
+    <string name="settings_speech_rate">Speech speed</string>
+    <string name="speech_rate_value">%1$.1fx</string>
     <string name="settings_voice_missing">No %1$s voice is installed. Install one under Settings › General management › Text-to-speech.</string>
     <string name="settings_reset_roi">Reset subtitle area</string>
     <string name="settings_app_language">App language</string>
