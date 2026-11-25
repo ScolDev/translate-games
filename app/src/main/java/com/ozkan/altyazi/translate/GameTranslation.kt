@@ -28,8 +28,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Where a shown translation came from. */
-enum class LineOrigin { PACK, ONLINE, AI, FAST }
+/** Where a shown translation came from; [ORIGINAL] is source text shown as is (translation off). */
+enum class LineOrigin { PACK, ONLINE, AI, FAST, ORIGINAL }
 
 data class GameTranslationResult(val text: String, val origin: LineOrigin, val packId: String? = null)
 

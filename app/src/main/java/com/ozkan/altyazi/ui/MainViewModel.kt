@@ -136,6 +136,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var lastFrameAt = 0L
 
     private var translateJob: Job? = null
+    private var translatorState: ModelState = ModelState.Checking
     private var nextLineId = 0L
 
     private val cameraInfos = mutableMapOf<String, CameraInfo>()
@@ -153,30 +154,40 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val previous = settings
                 settings = s
                 val pairChanged = previous.sourceLanguage != s.sourceLanguage || previous.targetLanguage != s.targetLanguage
-                if (first || pairChanged) {
-                    translator.prepare(s.sourceLanguage, s.targetLanguage)
+                val translationChanged = previous.translationEnabled != s.translationEnabled
+                if (translationChanged) {
+                    // Results of the old mode must never show up in the new one.
+                    translateJob?.cancel()
+                    aiJob?.cancel()
                     stabilizer.reset()
+                    aiContext.clear()
                 }
-                if (first || previous.targetLanguage != s.targetLanguage) speaker.setLanguage(s.targetLanguage.key)
+                if (s.translationEnabled && (first || pairChanged || translationChanged)) {
+                    translator.prepare(s.sourceLanguage, s.targetLanguage)
+                }
+                if (first || pairChanged) stabilizer.reset()
+                if (first || previous.speechLanguage != s.speechLanguage) speaker.setLanguage(s.speechLanguage.key)
                 speaker.setRate(s.speechRate)
                 speaker.setQueueMode(s.queueSpeech)
                 if (first || previous.speak != s.speak) speaker.setEnabled(s.speak)
                 if (!first && s.interruptsSpeech(previous)) speaker.stop()
                 tv.setEnabled(s.tvOutput, s)
-                if (first || previous.aiTranslation != s.aiTranslation) {
-                    if (s.aiTranslation) ai.enable() else ai.disable()
+                val aiWanted = s.aiTranslation && s.translationEnabled
+                if (first || aiWanted != (previous.aiTranslation && previous.translationEnabled)) {
+                    if (aiWanted) ai.enable() else ai.disable()
                 }
                 if (pairChanged) aiContext.clear()
                 if (previous.roi != s.roi || previous.streamRoi != s.streamRoi) stabilizer.reset()
                 _ui.update { it.copy(settings = s, settingsLoaded = true) }
+                if (first || translationChanged) publishModelState()
                 if (first || previous.cameraId != s.cameraId) chooseCamera()
                 first = false
             }
         }
         viewModelScope.launch {
             translator.state.collect { state ->
-                modelReady = state is ModelState.Ready
-                _ui.update { it.copy(modelState = state, showDownloadPrompt = state is ModelState.NeedsDownload) }
+                translatorState = state
+                publishModelState()
             }
         }
         viewModelScope.launch {
@@ -184,7 +195,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _ui.update {
                     it.copy(
                         aiState = state,
-                        showAiDownloadPrompt = state is AiState.NeedsDownload && settings.aiTranslation,
+                        showAiDownloadPrompt = state is AiState.NeedsDownload && settings.aiTranslation && settings.translationEnabled,
                     )
                 }
             }
@@ -205,6 +216,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { refreshCameras() }
         remote.frameSink = ::onStreamFrame
         viewModelScope.launch { game.game.collect { title -> _ui.update { it.copy(packGame = title) } } }
+    }
+
+    /** Without translation there is no model to wait for, so the pipeline counts as ready. */
+    private fun publishModelState() {
+        val translating = settings.translationEnabled
+        val state = if (translating) translatorState else ModelState.Ready
+        modelReady = state is ModelState.Ready
+        _ui.update { it.copy(modelState = state, showDownloadPrompt = translating && state is ModelState.NeedsDownload) }
     }
 
     // ---------- Source ----------
@@ -390,6 +409,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             aiJob?.cancel()
             val id = lineIdFor(text)
             val s = settings
+            if (!s.translationRequired) {
+                // Passthrough: same cleaning as the translation pipeline, but no engine, model or AI.
+                val line = SubtitleText.splitSpeaker(text)
+                val cleaned = line.format(SubtitleText.toSentenceCase(line.body, s.sourceLanguage == Language.ENGLISH))
+                present(id, text, cleaned, LineOrigin.ORIGINAL, Metrics(ocrMs, 0))
+                return@launch
+            }
             translateJob = launch {
                 val started = SystemClock.elapsedRealtime()
                 if (s.gameTranslationPair && s.packsEnabled) {
@@ -421,12 +447,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun present(id: Long, text: String, translated: String, origin: LineOrigin, metrics: Metrics) {
         showLine(SubtitleLine(id, text, translated, origin), metrics)
         tv.subtitle(translated)
-        aiContext.addLast(AiPrompt.ContextLine(text, translated))
+        if (origin != LineOrigin.ORIGINAL) aiContext.addLast(AiPrompt.ContextLine(text, translated))
         while (aiContext.size > AI_CONTEXT_LINES) aiContext.removeFirst()
         if (settings.speak) speaker.speak(translated)
     }
 
-    private fun aiActive() = settings.aiTranslation && ai.state.value is AiState.Ready
+    private fun aiActive() = settings.aiTranslation && settings.translationEnabled && ai.state.value is AiState.Ready
 
     /**
      * Typewriter-style subtitles grow in place: if the committed text extends the latest line, that
